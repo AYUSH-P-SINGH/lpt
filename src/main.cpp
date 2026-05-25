@@ -97,13 +97,15 @@ static void dsp_thread_fn()
 
             if (tc >= 9 && tc <= 18) {
                 // Airborne position (TC 9-18)
-                uint32_t lat_cpr = ((uint32_t)(me[1] & 0x03) << 15)
-                                 | ((uint32_t)me[2] << 7)
-                                 |  (me[3] >> 1);
-                uint32_t lon_cpr = ((uint32_t)(me[3] & 0x01) << 16)
-                                 | ((uint32_t)me[4] << 8)
-                                 |  me[5];
-                int odd = (me[0] >> 2) & 1;
+                // ME layout: [0]=TC|SS|NIC [1]=ALT[11:4] [2]=ALT[3:0]|T|F|LAT[16:15]
+                //            [3]=LAT[14:7] [4]=LAT[6:0]|LON[16] [5]=LON[15:8] [6]=LON[7:0]
+                int odd = (me[2] >> 2) & 1;
+                uint32_t lat_cpr = ((uint32_t)(me[2] & 0x03) << 15)
+                                 | ((uint32_t)me[3] << 7)
+                                 |  (me[4] >> 1);
+                uint32_t lon_cpr = ((uint32_t)(me[4] & 0x01) << 16)
+                                 | ((uint32_t)me[5] << 8)
+                                 |  me[6];
                 double lat, lon;
                 if (ac->position_valid) {
                     if (cpr_decode_local(lat_cpr, lon_cpr, odd,
@@ -170,11 +172,11 @@ int main()
 
     // Render loop on the main thread (~10 Hz).
     while (g_running) {
+        { std::lock_guard<std::mutex> lk(g_table_mutex); table_expire(now_ms(), 60000); }
+        map_draw_background();
+        map_draw_range_rings(50.0f);
         {
             std::lock_guard<std::mutex> lk(g_table_mutex);
-            table_expire(now_ms(), 60000);
-            map_draw_background();
-            map_draw_range_rings(50.0f);
             table_for_each([](const Aircraft* ac, void*) {
                 aircraft_draw(ac);
                 aircraft_draw_vector(ac);
