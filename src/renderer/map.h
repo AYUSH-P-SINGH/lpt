@@ -2,6 +2,8 @@
 #include <cstdint>
 
 // Initialize SDL2 window and renderer
+SDL_Renderer* map_renderer();
+
 // Returns 0 on success
 int  map_init(int width, int height, double center_lat, double center_lon);
 

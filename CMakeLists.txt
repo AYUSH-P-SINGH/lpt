@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(PkgConfig REQUIRED)
+find_package(SDL2 REQUIRED)
 pkg_check_modules(RTLSDR librtlsdr)
 pkg_check_modules(SDL2 sdl2)
 
@@ -22,6 +23,7 @@ if(RTLSDR_FOUND AND SDL2_FOUND)
     target_link_libraries(lpt PRIVATE
         ${RTLSDR_LIBRARIES}
         ${SDL2_LIBRARIES}
+        ${CMAKE_DL_LIBS}
     )
 
     target_compile_options(lpt PRIVATE -Wall -Wextra -O2)
