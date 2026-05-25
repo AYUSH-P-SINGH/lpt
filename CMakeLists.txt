@@ -40,3 +40,8 @@ foreach(test test_crc test_cpr test_demod)
     target_compile_options(${test} PRIVATE -Wall -Wextra -O2)
     add_test(NAME ${test} COMMAND ${test})
 endforeach()
+
+add_executable(test_tracker tests/test_tracker.cpp src/tracker/aircraft_table.cpp)
+target_include_directories(test_tracker PRIVATE src)
+target_compile_options(test_tracker PRIVATE -Wall -Wextra -O2)
+add_test(NAME test_tracker COMMAND test_tracker)
