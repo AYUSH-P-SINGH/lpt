@@ -18,3 +18,8 @@ make
 - librtlsdr
 - SDL2
 - CMake 3.16+
+
+## License
+
+MIT
+
