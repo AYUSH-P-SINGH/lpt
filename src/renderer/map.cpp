@@ -25,7 +25,7 @@ int map_init(int w, int h, double clat, double clon)
 
     s_renderer = SDL_CreateRenderer(s_window, -1,
                                     SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-    if (!s_renderer) return -1;
+    if (!s_renderer) { SDL_DestroyWindow(s_window); s_window = nullptr; return -1; }
 
     s_width      = w;
     s_height     = h;
@@ -51,16 +51,14 @@ void map_draw_background()
     double lon0 = s_clon - s_width  / (2.0 * s_px_per_deg) - 1.0;
     double lon1 = s_clon + s_width  / (2.0 * s_px_per_deg) + 1.0;
     for (double lon = floor(lon0); lon <= lon1; lon += 1.0) {
-        int x, y;
-        map_project(s_clat, lon, &x, &y);
+        int x = s_width / 2 + (int)((lon - s_clon) * s_px_per_deg);
         SDL_RenderDrawLine(s_renderer, x, 0, x, s_height);
     }
 
     double lat0 = s_clat - s_height / (2.0 * s_px_per_deg) - 1.0;
     double lat1 = s_clat + s_height / (2.0 * s_px_per_deg) + 1.0;
     for (double lat = floor(lat0); lat <= lat1; lat += 1.0) {
-        int x, y;
-        map_project(lat, s_clon, &x, &y);
+        int y = s_height / 2 - (int)((lat - s_clat) * s_px_per_deg);
         SDL_RenderDrawLine(s_renderer, 0, y, s_width, y);
     }
 }
@@ -75,10 +73,11 @@ void map_draw_range_rings(float ring_spacing_nm)
         double radius_deg = ring * ring_spacing_nm / 60.0;
         int    r_px       = (int)(radius_deg * s_px_per_deg);
         for (int deg = 0; deg < 360; deg++) {
-            double a  = deg * 3.14159265 / 180.0;
-            int    px = cx + (int)(r_px * cos(a));
-            int    py = cy + (int)(r_px * sin(a));
-            SDL_RenderDrawPoint(s_renderer, px, py);
+            double a0 = deg       * M_PI / 180.0;
+            double a1 = (deg + 1) * M_PI / 180.0;
+            SDL_RenderDrawLine(s_renderer,
+                cx + (int)(r_px * cos(a0)), cy + (int)(r_px * sin(a0)),
+                cx + (int)(r_px * cos(a1)), cy + (int)(r_px * sin(a1)));
         }
     }
 }
