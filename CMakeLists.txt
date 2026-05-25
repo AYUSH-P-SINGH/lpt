@@ -5,25 +5,29 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(RTLSDR REQUIRED librtlsdr)
-pkg_check_modules(SDL2 REQUIRED sdl2)
+pkg_check_modules(RTLSDR librtlsdr)
+pkg_check_modules(SDL2 sdl2)
 
-file(GLOB_RECURSE SOURCES src/*.cpp)
+if(RTLSDR_FOUND AND SDL2_FOUND)
+    file(GLOB_RECURSE SOURCES src/*.cpp)
 
-add_executable(lpt ${SOURCES})
+    add_executable(lpt ${SOURCES})
 
-target_include_directories(lpt PRIVATE
-    src
-    ${RTLSDR_INCLUDE_DIRS}
-    ${SDL2_INCLUDE_DIRS}
-)
+    target_include_directories(lpt PRIVATE
+        src
+        ${RTLSDR_INCLUDE_DIRS}
+        ${SDL2_INCLUDE_DIRS}
+    )
 
-target_link_libraries(lpt PRIVATE
-    ${RTLSDR_LIBRARIES}
-    ${SDL2_LIBRARIES}
-)
+    target_link_libraries(lpt PRIVATE
+        ${RTLSDR_LIBRARIES}
+        ${SDL2_LIBRARIES}
+    )
 
-target_compile_options(lpt PRIVATE -Wall -Wextra -O2)
+    target_compile_options(lpt PRIVATE -Wall -Wextra -O2)
+else()
+    message(STATUS "librtlsdr or SDL2 not found — skipping main lpt target")
+endif()
 
 # ── Tests ──────────────────────────────────────
 enable_testing()
@@ -33,5 +37,6 @@ foreach(test test_crc test_cpr test_demod)
                                              src/decoder/cpr.cpp
                                              src/dsp/demod.cpp)
     target_include_directories(${test} PRIVATE src)
+    target_compile_options(${test} PRIVATE -Wall -Wextra -O2)
     add_test(NAME ${test} COMMAND ${test})
 endforeach()
