@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <SDL2/SDL.h>
 
 // Initialize SDL2 window and renderer
 SDL_Renderer* map_renderer();

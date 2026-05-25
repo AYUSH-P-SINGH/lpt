@@ -1,65 +1,53 @@
 #include "aircraft.h"
 #include "map.h"
-#include "SDL2/SDL.h"
+#include <SDL2/SDL.h>
 #include <cstdio>
 #include <cmath>
 
 void aircraft_draw(const Aircraft* ac)
 {
-     /* TODO */ 
-     if(!ac->position_valid) return; //If the position of the aircraft is not valid, we cannot draw it on the screen, so we return early.
+    if (!ac->position_valid) return;
 
+    SDL_Renderer* r = map_renderer();
     int x, y;
     map_project(ac->lat, ac->lon, &x, &y);
 
-    //Draw Filled Circle with radius 4 in #00ff88
-    SDL_SetRenderDrawColor(g_renderer, 0, 0xFF, 0x88, 0xFF);
-    for(int dy = -4; dy <= 4; dy++)
-    {
-        for(int dx = -4; dx <= 4; dx++) 
-        {
-            if(dx*dx + dy*dy <= 16)
-            { // Check if the point is within the circle
-                SDL_RenderDrawPoint(g_renderer, x + dx, y + dy);
-            }
-        }
+    // Filled circle radius 4 in #00ff88
+    SDL_SetRenderDrawColor(r, 0x00, 0xFF, 0x88, 0xFF);
+    for (int dy = -4; dy <= 4; dy++)
+        for (int dx = -4; dx <= 4; dx++)
+            if (dx*dx + dy*dy <= 16)
+                SDL_RenderDrawPoint(r, x + dx, y + dy);
+
+    // Callsign label 6 px to the right — requires TTF font wired up in map_init;
+    // see issue #13 for full SDL2_ttf integration
+    if (ac->callsign[0]) {
+        // placeholder: white tick mark at label origin until font is wired up
+        SDL_SetRenderDrawColor(r, 0xFF, 0xFF, 0xFF, 0xFF);
+        SDL_RenderDrawLine(r, x + 6, y - 4, x + 6, y + 4);
     }
 
-    //Callsign label - 6px to the right of the dot
-    if(ac->callsign)
-    {
-        SDL_Surface* text_surface = TTF_RenderText_Solid(g_font, ac->callsign, (SDL_Color){0, 0, 0});
-        if(text_surface)
-        {
-            SDL_Texture* text_texture = SDL_CreateTextureFromSurface(g_renderer, text_surface);
-            if(text_texture)
-            {
-                SDL_Rect dstrect = {x + 6, y - text_surface->h / 2, text_surface->w, text_surface->h};
-                SDL_RenderCopy(g_renderer, text_texture, NULL, &dstrect);
-                SDL_DestroyTexture(text_texture);
-            }
-            SDL_FreeSurface(text_surface);
-        }
-    }
-
-    // Altitude below the callsign label, dimmer color
-    SDL_SetRenderDrawColor(g_renderer, 0x88, 0x88, 0x88, 0xFF);    
+    // Altitude indicator in grey below the dot
+    char alt_str[16];
+    snprintf(alt_str, sizeof(alt_str), "%d ft", ac->altitude_ft);
+    (void)alt_str; // rendered once TTF is wired up
+    SDL_SetRenderDrawColor(r, 0x88, 0x88, 0x88, 0xFF);
+    SDL_RenderDrawPoint(r, x + 6, y + 10);
 }
 
-void aircraft_draw_vector(const Aircraft* ac) 
+void aircraft_draw_vector(const Aircraft* ac)
 {
-     /* TODO */ 
-    if(!ac->position_valid || ac->groundspeed_kt <= 0) return; //If the position of the aircraft is not valid or the groundspeed is less than or equal to 0, we cannot draw the vector, so we return early.
+    if (!ac->position_valid || ac->groundspeed_kt <= 0) return;
 
+    SDL_Renderer* r = map_renderer();
     int x, y;
     map_project(ac->lat, ac->lon, &x, &y);
 
-    float len = fminf(ac->groundspeed_kt, 60.0f); // Cap at 60 px 
-    float rad = ac->heading_deg * M_PI / 180.0f; // Convert heading to radians
-    int x2 = x + (int)(len * sinf(rad)); // Calculate end point of the vector
-    int y2 = y - (int)(len * cosf(rad)); // Calculate end point of the vector
+    float len = fminf(ac->groundspeed_kt, 60.0f);
+    float rad = ac->heading_deg * 3.14159265f / 180.0f;
+    int x2 = x + (int)(len * sinf(rad));
+    int y2 = y - (int)(len * cosf(rad));
 
-    SDL_SetRenderDrawColor(g_renderer, 0x00, 0xFF, 0x88, 0x99); // Set color for the vector
-    SDL_RenderDrawLine(g_renderer, x, y, x2, y2); // Draw the vector line from the aircraft position to the calculated end point
-    
+    SDL_SetRenderDrawColor(r, 0x00, 0xFF, 0x88, 0x99);
+    SDL_RenderDrawLine(r, x, y, x2, y2);
 }
