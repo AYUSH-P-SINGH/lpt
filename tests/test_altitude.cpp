@@ -20,6 +20,15 @@ int main()
     // Gillham Gray-code path: raw=0 → D100==0 → invalid
     assert(altitude_decode_gillham(0) == INT32_MIN);
 
+    // Gillham Gray-code path: raw=641 → D500=2,D100=1 → -200 ft
+    // bit layout: A2=bit9, A4=bit7, D4=bit0 set; Q=bit4=0
+    // grayC=0, grayA=3→D500=2; grayB=0, grayD=1→D100=1; D500 even, no flip
+    assert(altitude_decode_gillham(641) == -200);
+
+    // Gillham Gray-code path: raw=7 → D100==5 → invalid
+    // grayB=1, grayD=3 → gray_to_bin(7)=5; D100==5 → INT32_MIN
+    assert(altitude_decode_gillham(7) == INT32_MIN);
+
     printf("test_altitude: all tests passed\n");
     return 0;
 }
