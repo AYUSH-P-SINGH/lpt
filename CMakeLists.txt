@@ -51,3 +51,8 @@ add_executable(test_tracker tests/test_tracker.cpp src/tracker/aircraft_table.cp
 target_include_directories(test_tracker PRIVATE src)
 target_compile_options(test_tracker PRIVATE -Wall -Wextra -O2)
 add_test(NAME test_tracker COMMAND test_tracker)
+
+add_executable(test_modes tests/test_modes.cpp src/decoder/modes.cpp src/decoder/crc.cpp)
+target_include_directories(test_modes PRIVATE src)
+target_compile_options(test_modes PRIVATE -Wall -Wextra -O2)
+add_test(NAME test_modes COMMAND test_modes)
