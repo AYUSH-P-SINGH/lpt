@@ -31,6 +31,42 @@ else()
     message(STATUS "librtlsdr or SDL2 not found — skipping main lpt target")
 endif()
 
+# ── lpt-web: HTTP server mode (no SDL2 required) ─────────────────────────────
+if(RTLSDR_FOUND)
+    set(LPT_WEB_SOURCES
+        src/main-web.cpp
+        src/web/server.cpp
+        src/radio/rtlsdr.cpp
+        src/radio/ring_buffer.cpp
+        src/dsp/preamble.cpp
+        src/dsp/demod.cpp
+        src/decoder/modes.cpp
+        src/decoder/crc.cpp
+        src/decoder/cpr.cpp
+        src/decoder/altitude.cpp
+        src/decoder/velocity.cpp
+        src/decoder/callsign.cpp
+        src/tracker/aircraft_table.cpp
+    )
+
+    add_executable(lpt-web ${LPT_WEB_SOURCES})
+
+    target_include_directories(lpt-web PRIVATE
+        src
+        ${VENDOR_DIR}
+        ${RTLSDR_INCLUDE_DIRS}
+    )
+
+    target_link_libraries(lpt-web PRIVATE
+        ${RTLSDR_LIBRARIES}
+        ${CMAKE_DL_LIBS}
+    )
+
+    target_compile_options(lpt-web PRIVATE -Wall -Wextra -O2)
+else()
+    message(STATUS "librtlsdr not found — skipping lpt-web target")
+endif()
+
 # ── Tests ──────────────────────────────────────
 enable_testing()
 
