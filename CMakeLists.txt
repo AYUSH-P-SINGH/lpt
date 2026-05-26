@@ -47,6 +47,11 @@ foreach(test test_crc test_cpr test_demod)
     add_test(NAME ${test} COMMAND ${test})
 endforeach()
 
+add_executable(test_altitude tests/test_altitude.cpp src/decoder/altitude.cpp)
+target_include_directories(test_altitude PRIVATE src)
+target_compile_options(test_altitude PRIVATE -Wall -Wextra -O2)
+add_test(NAME test_altitude COMMAND test_altitude)
+
 add_executable(test_tracker tests/test_tracker.cpp src/tracker/aircraft_table.cpp)
 target_include_directories(test_tracker PRIVATE src)
 target_compile_options(test_tracker PRIVATE -Wall -Wextra -O2)
