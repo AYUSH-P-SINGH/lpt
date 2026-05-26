@@ -4,3 +4,4 @@ build/
 *.out
 lpt
 .DS_Store
+.claude/

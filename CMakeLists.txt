@@ -33,6 +33,11 @@ endif()
 # ── Tests ──────────────────────────────────────
 enable_testing()
 
+add_executable(test_callsign tests/test_callsign.cpp src/decoder/callsign.cpp)
+target_include_directories(test_callsign PRIVATE src)
+target_compile_options(test_callsign PRIVATE -Wall -Wextra -O2)
+add_test(NAME test_callsign COMMAND test_callsign)
+
 foreach(test test_crc test_cpr test_demod)
     add_executable(${test} tests/${test}.cpp src/decoder/crc.cpp
                                              src/decoder/cpr.cpp
