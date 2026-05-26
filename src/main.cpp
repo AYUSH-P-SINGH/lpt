@@ -140,7 +140,7 @@ static void dsp_thread_fn()
                     ac->groundspeed_kt = spd;
                     ac->heading_deg    = hdg;
                     ac->vert_rate_fpm  = vr;
-}
+                }
             }
 
             pos += (uint32_t)frame_len * 8 * 2;

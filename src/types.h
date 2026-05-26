@@ -1,6 +1,10 @@
 #pragma once
 #include <cstdint>
 
+static const int TRAIL_MAX = 100;
+
+struct LatLon { double lat; double lon; };
+
 // Raw IQ sample from RTL-SDR
 struct IQSample {
     int16_t i;
@@ -24,6 +28,12 @@ struct Aircraft {
     int32_t  altitude_ft;       // pressure altitude in feet
     float    groundspeed_kt;    // knots
     float    heading_deg;       // 0-360 degrees
+    int32_t  vert_rate_fpm;     // vertical rate in feet per minute
+    uint64_t first_seen_ms;     // timestamp of first received message
     uint64_t last_seen_ms;      // timestamp of last received message
+    uint32_t msgs_rx;           // count of received messages
     bool     position_valid;    // true once CPR decode has succeeded
+    LatLon   trail[TRAIL_MAX];  // position history (circular buffer)
+    int      trail_head;        // next write index
+    int      trail_len;         // valid entries (0..TRAIL_MAX)
 };
