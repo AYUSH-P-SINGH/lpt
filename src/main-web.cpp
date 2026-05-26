@@ -1,6 +1,8 @@
 // src/main-web.cpp — web-mode entry point (no SDL2)
+#include <cmath>
 #include <cstdio>
 #include <csignal>
+#include <cstring>
 #include <thread>
 #include <atomic>
 #include <mutex>
@@ -31,7 +33,118 @@ static RingBuffer        g_ring;
 static std::atomic<bool> g_running{true};
 static std::mutex        g_table_mutex;
 
-// copy iq_to_mag, now_ms, dsp_thread_fn, radio_cb verbatim from src/main.cpp
+static void iq_to_mag(const uint8_t* iq, uint32_t iq_len, float* out)
+{
+    for (uint32_t i = 0; i < iq_len / 2; i++) {
+        float I = (float)iq[2*i]   - 127.5f;
+        float Q = (float)iq[2*i+1] - 127.5f;
+        out[i] = hypotf(I, Q);
+    }
+}
+
+static uint64_t now_ms()
+{
+    using namespace std::chrono;
+    return (uint64_t)duration_cast<milliseconds>(
+        steady_clock::now().time_since_epoch()).count();
+}
+
+static void dsp_thread_fn()
+{
+    const uint32_t CHUNK   = 262144;
+    const uint32_t MAG_LEN = CHUNK / 2;
+
+    std::vector<uint8_t> raw(CHUNK);
+    std::vector<float>   mag(MAG_LEN);
+    uint8_t bits[112];
+
+    while (g_running) {
+        uint32_t got = rb_pop(&g_ring, raw.data(), CHUNK);
+        if (got < 32) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            continue;
+        }
+
+        iq_to_mag(raw.data(), got, mag.data());
+        uint32_t mag_len = got / 2;
+        uint32_t pos = 0;
+
+        while (pos + 16 + 56 * 4 <= mag_len) {
+            int pre = preamble_search(mag.data() + pos, mag_len - pos);
+            if (pre < 0) break;
+            pos += (uint32_t)pre + 16;
+
+            int nbits = demod_ook(mag.data() + pos, mag_len - pos, bits);
+            if (nbits < 56) { pos++; continue; }
+
+            uint8_t frame_len = (nbits >= 112) ? 14 : 7;
+            uint8_t raw_bytes[14] = {};
+            for (int i = 0; i < frame_len; i++)
+                for (int b = 0; b < 8; b++)
+                    raw_bytes[i] |= bits[i * 8 + b] << (7 - b);
+
+            ModeSFrame frame{};
+            if (!modes_parse(raw_bytes, frame_len, &frame)) { pos++; continue; }
+
+            uint8_t tc = modes_tc(&frame);
+            const uint8_t* me = frame.data + 4;
+
+            std::lock_guard<std::mutex> lk(g_table_mutex);
+            Aircraft* ac = table_upsert(frame.icao, now_ms());
+
+            if (tc >= 1 && tc <= 4) {
+                char cs[9];
+                if (callsign_decode(me, cs))
+                    memcpy(ac->callsign, cs, sizeof(ac->callsign));
+            } else if (tc >= 9 && tc <= 18) {
+                int odd = (me[2] >> 2) & 1;
+                uint32_t lat_cpr = ((uint32_t)(me[2] & 0x03) << 15)
+                                 | ((uint32_t)me[3] << 7)
+                                 |  (me[4] >> 1);
+                uint32_t lon_cpr = ((uint32_t)(me[4] & 0x01) << 16)
+                                 | ((uint32_t)me[5] << 8)
+                                 |  me[6];
+                double lat, lon;
+                if (ac->position_valid) {
+                    if (cpr_decode_local(lat_cpr, lon_cpr, odd,
+                                         ac->lat, ac->lon, &lat, &lon)) {
+                        ac->lat = lat;
+                        ac->lon = lon;
+                        ac->trail[ac->trail_head] = { ac->lat, ac->lon };
+                        ac->trail_head = (ac->trail_head + 1) % TRAIL_MAX;
+                        if (ac->trail_len < TRAIL_MAX) ac->trail_len++;
+                    }
+                } else {
+                    if (cpr_decode_local(lat_cpr, lon_cpr, odd,
+                                         HOME_LAT, HOME_LON, &lat, &lon)) {
+                        ac->lat = lat;
+                        ac->lon = lon;
+                        ac->position_valid = true;
+                    }
+                }
+                uint16_t alt_raw = ((uint16_t)(me[1] & 0xFF) << 4)
+                                 |  (me[2] >> 4);
+                int32_t alt = altitude_decode_gillham(alt_raw);
+                if (alt != INT32_MIN) ac->altitude_ft = alt;
+            } else if (tc == 19) {
+                float spd, hdg;
+                int32_t vr;
+                if (velocity_decode(me, &spd, &hdg, &vr)) {
+                    ac->groundspeed_kt = spd;
+                    ac->heading_deg    = hdg;
+                    ac->vert_rate_fpm  = vr;
+                }
+            }
+
+            pos += (uint32_t)frame_len * 8 * 2;
+        }
+    }
+}
+
+static void radio_cb(const uint8_t* buf, uint32_t len)
+{
+    rb_push(&g_ring, buf, len);
+}
 
 int main()
 {
