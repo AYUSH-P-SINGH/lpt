@@ -50,12 +50,12 @@ int main()
         frame[6] =  crc        & 0xFF;
         assert(modes_parse(frame, 7, &f));
         assert(modes_df(&f) == 11);
+        assert(f.icao == 0u);  // non-DF17/18 → ICAO must not be extracted
     }
 
     // Test 4: invalid length (10 bytes) → returns false
     {
         uint8_t frame[14] = {};
-        (void)frame;
         assert(!modes_parse(frame, 10, &f));
     }
 
