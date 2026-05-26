@@ -57,6 +57,11 @@ target_include_directories(test_tracker PRIVATE src)
 target_compile_options(test_tracker PRIVATE -Wall -Wextra -O2)
 add_test(NAME test_tracker COMMAND test_tracker)
 
+add_executable(test_velocity tests/test_velocity.cpp src/decoder/velocity.cpp)
+target_include_directories(test_velocity PRIVATE src)
+target_compile_options(test_velocity PRIVATE -Wall -Wextra -O2)
+
+add_test(NAME test_velocity COMMAND test_velocity)
 add_executable(test_preamble tests/test_preamble.cpp src/dsp/preamble.cpp)
 target_include_directories(test_preamble PRIVATE src)
 target_compile_options(test_preamble PRIVATE -Wall -Wextra -O2)
