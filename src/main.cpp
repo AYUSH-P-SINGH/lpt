@@ -112,6 +112,10 @@ static void dsp_thread_fn()
                                          ac->lat, ac->lon, &lat, &lon)) {
                         ac->lat = lat;
                         ac->lon = lon;
+
+                        ac->trail[ac->trail_head] = { ac->lat, ac->lon };
+                        ac->trail_head = (ac->trail_head + 1) % TRAIL_MAX;
+                        if (ac->trail_len < TRAIL_MAX) ac->trail_len++;
                     }
                 } else {
                     // First position: use receiver location as reference
@@ -135,7 +139,8 @@ static void dsp_thread_fn()
                 if (velocity_decode(me, &spd, &hdg, &vr)) {
                     ac->groundspeed_kt = spd;
                     ac->heading_deg    = hdg;
-                }
+                    ac->vert_rate_fpm  = vr;
+}
             }
 
             pos += (uint32_t)frame_len * 8 * 2;

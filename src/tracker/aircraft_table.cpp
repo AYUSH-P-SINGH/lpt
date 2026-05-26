@@ -6,16 +6,17 @@ static std::unordered_map<uint32_t, Aircraft> s_table;
 
 Aircraft* table_upsert(uint32_t icao, uint64_t now_ms)
 {
-    auto it = s_table.find(icao);
-    if (it == s_table.end()) {
-        Aircraft ac{};
-        ac.icao = icao;
-        ac.last_seen_ms = now_ms;
-        s_table[icao] = ac;
-    } else {
-        it->second.last_seen_ms = now_ms;
+    auto [it, inserted] = s_table.emplace(icao, Aircraft{});
+    Aircraft& ac = it->second;
+    if (inserted) {
+        ac.icao          = icao;
+        ac.first_seen_ms = now_ms;
+        ac.trail_len     = 0;
+        ac.trail_head    = 0;
     }
-    return &s_table[icao];
+    ac.last_seen_ms = now_ms;
+    ac.msgs_rx++;
+    return &ac;
 }
 
 void table_expire(uint64_t now_ms, uint64_t timeout_ms)
