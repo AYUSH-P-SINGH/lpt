@@ -27,6 +27,16 @@ int main()
     { uint8_t me[] = {0x99,0x00,0x00,0x0C,0xA0,0x00,0x00};
       assert(!velocity_decode(me,&spd,&hdg,&vr)); }
 
+    // Zero NS → false  (ns_vel_raw=0 in payload[3:4])
+    { uint8_t me[] = {0x99,0x00,0x65,0x00,0x00,0x00,0x00};
+      assert(!velocity_decode(me,&spd,&hdg,&vr)); }
+
+    // 100 kt due west (ew_dir=1) → heading ≈ 270°
+    // payload[1]=0x04: ew_dir=bit2=1, ew_vel_raw=101; ns_vel_raw=1 (0 kt after decrement)
+    { uint8_t me[] = {0x99,0x04,0x65,0x00,0x20,0x00,0x00};
+      assert(velocity_decode(me,&spd,&hdg,&vr));
+      assert(approx(spd,100.f)); assert(approx(hdg,270.f)); }
+
     // Climbing 512 fpm
     { uint8_t me[] = {0x99,0x00,0x65,0x00,0x20,0x12,0x00};
       assert(velocity_decode(me,&spd,&hdg,&vr));
