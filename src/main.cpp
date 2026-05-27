@@ -1,3 +1,4 @@
+#include <csignal>
 #include <cstdio>
 #include <cstdint>
 #include <thread>
@@ -21,10 +22,13 @@
 #include "renderer/aircraft.h"
 #include "tracker/aircraft_table.h"
 
+static volatile sig_atomic_t g_got_signal = 0;
+
 static const uint32_t ADSB_FREQ_HZ     = 1090000000U;
 static const uint32_t ADSB_SAMPLE_RATE = 2000000U;
 static const int      MAP_W            = 1024;
 static const int      MAP_H            = 768;
+
 // Default centre — user can override via argv in a future issue
 static const double   HOME_LAT         = 37.7749;
 static const double   HOME_LON         = -122.4194;
@@ -96,17 +100,18 @@ static void dsp_thread_fn()
             Aircraft* ac = table_upsert(frame.icao, now_ms());
 
             if (tc >= 9 && tc <= 18) {
-                // Airborne position (TC 9-18)
-                // ME layout: [0]=TC|SS|NIC [1]=ALT[11:4] [2]=ALT[3:0]|T|F|LAT[16:15]
-                //            [3]=LAT[14:7] [4]=LAT[6:0]|LON[16] [5]=LON[15:8] [6]=LON[7:0]
                 int odd = (me[2] >> 2) & 1;
+
                 uint32_t lat_cpr = ((uint32_t)(me[2] & 0x03) << 15)
                                  | ((uint32_t)me[3] << 7)
                                  |  (me[4] >> 1);
+
                 uint32_t lon_cpr = ((uint32_t)(me[4] & 0x01) << 16)
                                  | ((uint32_t)me[5] << 8)
                                  |  me[6];
+
                 double lat, lon;
+
                 if (ac->position_valid) {
                     if (cpr_decode_local(lat_cpr, lon_cpr, odd,
                                          ac->lat, ac->lon, &lat, &lon)) {
@@ -115,10 +120,11 @@ static void dsp_thread_fn()
 
                         ac->trail[ac->trail_head] = { ac->lat, ac->lon };
                         ac->trail_head = (ac->trail_head + 1) % TRAIL_MAX;
-                        if (ac->trail_len < TRAIL_MAX) ac->trail_len++;
+
+                        if (ac->trail_len < TRAIL_MAX)
+                            ac->trail_len++;
                     }
                 } else {
-                    // First position: use receiver location as reference
                     if (cpr_decode_local(lat_cpr, lon_cpr, odd,
                                          HOME_LAT, HOME_LON, &lat, &lon)) {
                         ac->lat = lat;
@@ -129,13 +135,16 @@ static void dsp_thread_fn()
 
                 uint16_t alt_raw = ((uint16_t)(me[1] & 0xFF) << 4)
                                  |  (me[2] >> 4);
+
                 int32_t alt = altitude_decode_gillham(alt_raw);
-                if (alt != INT32_MIN) ac->altitude_ft = alt;
+
+                if (alt != INT32_MIN)
+                    ac->altitude_ft = alt;
 
             } else if (tc == 19) {
-                // Airborne velocity
                 float spd, hdg;
                 int32_t vr;
+
                 if (velocity_decode(me, &spd, &hdg, &vr)) {
                     ac->groundspeed_kt = spd;
                     ac->heading_deg    = hdg;
@@ -156,7 +165,7 @@ static void radio_cb(const uint8_t* buf, uint32_t len)
 
 int main()
 {
-    printf("lpt \xe2\x80\x94 ADS-B Plane Tracker\n");
+    printf("lpt — ADS-B Plane Tracker\n");
     printf("Tuning to %.0f MHz...\n", ADSB_FREQ_HZ / 1e6);
 
     rb_init(&g_ring);
@@ -175,26 +184,51 @@ int main()
     std::thread radio_thread([]() { rtlsdr_start(radio_cb); });
     std::thread dsp_thread(dsp_thread_fn);
 
+    struct sigaction sa{};
+
+    sa.sa_handler = [](int) {
+        g_got_signal = 1;
+    };
+
+    sa.sa_flags = SA_RESTART;
+
+    sigemptyset(&sa.sa_mask);
+
+    sigaction(SIGINT, &sa, nullptr);
+    sigaction(SIGTERM, &sa, nullptr);
+
     // Render loop on the main thread (~10 Hz).
-    while (g_running) {
-        { std::lock_guard<std::mutex> lk(g_table_mutex); table_expire(now_ms(), 60000); }
-        map_draw_background();
-        map_draw_range_rings(50.0f);
+    while (g_running && !g_got_signal) {
         {
             std::lock_guard<std::mutex> lk(g_table_mutex);
+            table_expire(now_ms(), 60000);
+        }
+
+        map_draw_background();
+        map_draw_range_rings(50.0f);
+
+        {
+            std::lock_guard<std::mutex> lk(g_table_mutex);
+
             table_for_each([](const Aircraft* ac, void*) {
                 aircraft_draw(ac);
                 aircraft_draw_vector(ac);
             }, nullptr);
         }
-        if (!map_present()) g_running = false;
+
+        if (!map_present())
+            g_running = false;
+
         SDL_Delay(100);
     }
+
+    g_running = false;
 
     rtlsdr_stop();
     radio_thread.join();
     dsp_thread.join();
     rtlsdr_close();
     map_close();
+
     return 0;
 }
