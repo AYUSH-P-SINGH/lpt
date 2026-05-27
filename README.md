@@ -59,7 +59,7 @@ The project also includes a browser-based aircraft scope using `lpt-web`.
 # Requires: cmake 3.16+, librtlsdr, g++
 cmake -B build
 cmake --build build --target lpt-web
-
+```
 
 ### Run
 
